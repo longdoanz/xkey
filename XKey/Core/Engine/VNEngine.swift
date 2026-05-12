@@ -366,16 +366,11 @@ class VNEngine {
         // Same logic as processWordBreak() at the end
         cursorMovedSinceReset = false
         
-        // Upper case first char
-        if vUpperCaseFirstChar == 1 {
-            if keyCode == VietnameseData.KEY_DOT {
-                upperCaseStatus = 1
-            } else if keyCode == VietnameseData.KEY_ENTER || keyCode == VietnameseData.KEY_RETURN {
-                upperCaseStatus = 2
-            } else {
-                upperCaseStatus = 0
-            }
-        }
+        // Upper case first char — delegate to updateUpperCaseStatus()
+        // which is the single source of truth for status transitions.
+        // Use the character parameter directly — it already contains the correct
+        // character ("\n" for Enter, "." for period, " " for space, etc.)
+        updateUpperCaseStatus(character: character)
     }
     
     
@@ -644,8 +639,10 @@ class VNEngine {
         }
         
         // Upper case first char
+        // Status 1 = after period ("."), status 2 = after newline
+        // Both should trigger auto-capitalize on the first character of the next word
         if vUpperCaseFirstChar == 1 {
-            if index == 1 && upperCaseStatus == 2 {
+            if index == 1 && upperCaseStatus >= 1 {
                 upperCaseFirstCharacter()
             }
             upperCaseStatus = 0
@@ -3065,17 +3062,25 @@ class VNEngine {
     }
 
     /// Update upperCaseStatus based on the word break character
-    /// Called from processWordBreak() and externally when buffer is empty
+    /// Called from processWordBreak(), handleWordBreak(), and externally when buffer is empty
     /// to ensure auto-capitalize works regardless of which code path runs.
+    ///
+    /// Status values:
+    ///   0 = no pending capitalize
+    ///   1 = after sentence-ending punctuation (., ?, !)
+    ///   2 = after newline (\n, \r)
     func updateUpperCaseStatus(character: Character) {
         guard vUpperCaseFirstChar == 1 else { return }
-        if character == "." {
+        if character == "." || character == "?" || character == "!" {
             upperCaseStatus = 1
         } else if character == "\n" || character == "\r" {
             upperCaseStatus = 2
-        } else {
+        } else if character != " " {
+            // Only reset if NOT space — space should preserve pending capitalize status
+            // Flow: sentence-end punctuation → space(s) → next char should be capitalized
             upperCaseStatus = 0
         }
+        // If space: keep upperCaseStatus as-is (preserves period/newline status)
     }
 
     /// Notify engine that focus changed during typing session
@@ -3238,6 +3243,13 @@ extension VNEngine {
     /// Process word break (space, punctuation, etc.)
     /// Returns ProcessResult with macro replacement if found
     func processWordBreak(character: Character) -> ProcessResult {
+        // Ensure upperCaseStatus is always updated regardless of which return path is taken.
+        // This centralizes the invariant: every processWordBreak call must update the status,
+        // whether it returns early via macro replacement, spell-check restore, or the normal end.
+        // Without this guard, early returns would skip the status update and break auto-capitalize
+        // after sentence-ending punctuation that triggers macro or restore.
+        defer { updateUpperCaseStatus(character: character) }
+
         // Only trigger macro on SPACE - not on other word break characters
         // This prevents macros like "you@" from triggering immediately when typing "@"
         // User needs to press space to trigger macro replacement
@@ -3266,6 +3278,7 @@ extension VNEngine {
                 // Reset after macro replacement - clears history because macro output
                 // can be very large (code snippets, templates) and shouldn't be stored
                 reset()
+                // upperCaseStatus is updated via defer on function exit
                 return result
             }
         }
@@ -3373,6 +3386,7 @@ extension VNEngine {
                                         // Reset after macro replacement - clears history because macro output
                                         // can be very large and shouldn't be stored
                                         reset()
+                                        // upperCaseStatus is updated via defer on function exit
                                         return result
                                     }
                                 }
@@ -3420,6 +3434,7 @@ extension VNEngine {
                             // Use startNewSession() to clear buffer but preserve history
                             startNewSession()
                             spaceCount = 1
+                            // upperCaseStatus is updated via defer on function exit
                             return result
                         }
                     } else if tempDisableKey && !hasVNProcessing {
@@ -3557,8 +3572,8 @@ extension VNEngine {
         // This allows restore logic to work normally for the next word
         cursorMovedSinceReset = false
 
-        // Upper case first char - update status based on word break character
-        updateUpperCaseStatus(character: character)
+        // upperCaseStatus is updated via defer on function exit
+        // (see top of function — defer { updateUpperCaseStatus(character: character) })
 
         return ProcessResult() // Empty result, no consumption
     }

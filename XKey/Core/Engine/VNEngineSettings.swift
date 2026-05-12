@@ -62,6 +62,12 @@ extension VNEngine {
         vQuickTelex = settings.quickTelexEnabled ? 1 : 0
         vQuickStartConsonant = settings.quickStartConsonantEnabled ? 1 : 0
         vQuickEndConsonant = settings.quickEndConsonantEnabled ? 1 : 0
+        // Clear any pending auto-capitalize status when feature is toggled off,
+        // so stale status from before the toggle doesn't leak into future typing
+        // if the feature is later re-enabled.
+        if !settings.upperCaseFirstChar {
+            upperCaseStatus = 0
+        }
         vUpperCaseFirstChar = settings.upperCaseFirstChar ? 1 : 0
         vRestoreIfWrongSpelling = settings.restoreIfWrongSpelling ? 1 : 0
 

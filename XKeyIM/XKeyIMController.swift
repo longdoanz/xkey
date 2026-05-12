@@ -130,6 +130,7 @@ class XKeyIMController: IMKInputController {
         engineSettings.spellCheckEnabled = settings.spellCheckEnabled
 
         engineSettings.quickTelexEnabled = settings.quickTelexEnabled
+        engineSettings.upperCaseFirstChar = settings.upperCaseFirstChar
 
         engineSettings.restoreIfWrongSpelling = settings.restoreIfWrongSpelling
         
@@ -410,6 +411,8 @@ class XKeyIMController: IMKInputController {
             
             // Commit any marked text first
             commitComposition(client)
+            // Set uppercase status BEFORE reset so auto-capitalize triggers for next word
+            engine.updateUpperCaseStatus(character: "\n")
             engine.resetWithCursorMoved()  // Enter moves cursor to new line
             currentWordLength = 0
             markedTextStartLocation = NSNotFound
@@ -1287,6 +1290,7 @@ class XKeyIMSettings {
 
     var quickTelexEnabled: Bool = true
     var restoreIfWrongSpelling: Bool = true
+    var upperCaseFirstChar: Bool = false
     var useMarkedText: Bool = true  // Default to true - standard IMKit behavior
     var debugModeEnabled: Bool = false  // Controls whether XKeyIM writes to ~/XKey_Debug.log
     
@@ -1317,6 +1321,7 @@ class XKeyIMSettings {
 
         quickTelexEnabled = readBool(forKey: "XKey.quickTelexEnabled", defaultValue: true)
         restoreIfWrongSpelling = readBool(forKey: "XKey.restoreIfWrongSpelling", defaultValue: true)
+        upperCaseFirstChar = readBool(forKey: "XKey.upperCaseFirstChar")
         
         // Use Marked Text
         let oldUseMarkedText = useMarkedText
