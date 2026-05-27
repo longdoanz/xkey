@@ -641,8 +641,10 @@ class VNEngine {
         // Upper case first char
         // Status 1 = after period ("."), status 2 = after newline
         // Both should trigger auto-capitalize on the first character of the next word
+        // Skip in browser address bars — "." is a domain separator, not a sentence end
+        // (e.g. "google.com" must not become "google.Com").
         if vUpperCaseFirstChar == 1 {
-            if index == 1 && upperCaseStatus >= 1 {
+            if index == 1 && upperCaseStatus >= 1 && !AppBehaviorDetector.shared.isInBrowserAddressBar() {
                 upperCaseFirstCharacter()
             }
             upperCaseStatus = 0
@@ -3047,14 +3049,26 @@ class VNEngine {
         willTempOffEngine = false
         cursorMovedSinceReset = false
         focusChangedDuringTyping = false
+        // NOTE: upperCaseStatus is intentionally NOT cleared here.
+        // Soft resets (Tab, Forward Delete, Enter-with-empty-buffer) preserve
+        // sentence context — the calling code sets the status around reset()
+        // to propagate sentence-end (e.g. "\n") into the next typing session.
+        // Hard resets that imply lost context (mouse click, arrow keys, app
+        // switch, focus change) go through resetWithCursorMoved() which DOES
+        // clear the status.
     }
 
     /// Reset engine with cursor movement flag set
     /// This indicates that user moved cursor (via mouse/arrow keys) and may be editing
     /// in the middle of an existing word. Restore logic will be skipped in this case.
+    /// Also clears any pending auto-capitalize status: a cursor move means the
+    /// editing context that produced the status (the sentence-ender) is no longer
+    /// where the user is now typing — otherwise the next character at the new
+    /// location would silently capitalize (e.g. after paste + click + delete).
     func resetWithCursorMoved() {
         reset()
         cursorMovedSinceReset = true
+        upperCaseStatus = 0
         logCallback?("resetWithCursorMoved: cursor moved flag set")
     }
 

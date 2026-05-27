@@ -411,9 +411,12 @@ class XKeyIMController: IMKInputController {
             
             // Commit any marked text first
             commitComposition(client)
-            // Set uppercase status BEFORE reset so auto-capitalize triggers for next word
-            engine.updateUpperCaseStatus(character: "\n")
+            // Reset FIRST (clears cursor-moved state + any stale pending capitalize),
+            // then set the newline status so the NEXT character on the next line
+            // is capitalized. Order matters: resetWithCursorMoved() clears
+            // upperCaseStatus, so it must come before updateUpperCaseStatus("\n").
             engine.resetWithCursorMoved()  // Enter moves cursor to new line
+            engine.updateUpperCaseStatus(character: "\n")
             currentWordLength = 0
             markedTextStartLocation = NSNotFound
             

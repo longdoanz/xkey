@@ -1432,6 +1432,68 @@ class AppBehaviorDetector {
         cachedBundleId = nil
         cachedBehavior = nil
     }
+
+    /// Canonical address bar detection — shared by `detectBehavior`,
+    /// `isInBrowserAddressBar`, and any future caller that needs the same
+    /// "is this a browser URL bar?" answer. Mirrors the bundle-specific
+    /// dispatch in `detectInjectionMethod` so all paths stay in sync.
+    /// - Returns: true iff focused element is a known browser address bar.
+    func isAddressBar(info: FocusedElementInfo, bundleId: String) -> Bool {
+        let isBrowserApp = Self.browserApps.contains(bundleId)
+            || Self.firefoxBasedBrowsers.contains(bundleId)
+            || Self.axAttributeDetectForBrowsers.contains(bundleId)
+        guard isBrowserApp else { return false }
+
+        // Safari: AX Identifier — early return prevents cross-browser false positives
+        if bundleId == "com.apple.Safari" || bundleId == "com.apple.SafariTechnologyPreview" {
+            return isSafariAddressBar(info: info)
+        }
+
+        // Firefox-style (Firefox family + Zen): DOM ID / AX Description
+        if Self.firefoxBasedBrowsers.contains(bundleId) || Self.axAttributeDetectForBrowsers.contains(bundleId) {
+            return isFirefoxStyleAddressBar(info: info)
+        }
+
+        // Chromium-based (Chrome, Edge, Brave, Opera, Vivaldi, Arc, ...)
+        if isChromiumAddressBar(info: info) { return true }
+        if isOperaSpeedDialAddressBar(bundleId: bundleId, role: info.role) { return true }
+        if bundleId == "company.thebrowser.dia" && isDiaAddressBar(info: info) { return true }
+        return false
+    }
+
+    /// Check if the focused input is a browser address bar (URL bar).
+    /// Used to disable features that conflict with URL typing — e.g. auto-capitalize
+    /// would otherwise capitalize the character after "." in domain names ("google.Com").
+    ///
+    /// Detection priority:
+    /// 1. Confirmed/cached injection method description — set by AppDelegate focus
+    ///    observers and KeyboardEventHandler. Cheapest, reflects most recent context.
+    /// 2. Fresh AX query via canonical `isAddressBar(info:bundleId:)`.
+    func isInBrowserAddressBar() -> Bool {
+        // Fast path: confirmed injection method already encodes address bar context.
+        // Set by focus observers, mouse click handler, and KeyboardEventHandler.
+        if let confirmed = confirmedInjectionMethod,
+           confirmed.description.contains("Address Bar") {
+            return true
+        }
+        guard let bundleId = getCurrentBundleId() else { return false }
+
+        // Cheap browser-app gate — avoids a wasted AX query for non-browser apps,
+        // which would otherwise cost 6+ AX attribute reads via getFocusedElementInfo().
+        let isBrowserApp = Self.browserApps.contains(bundleId)
+            || Self.firefoxBasedBrowsers.contains(bundleId)
+            || Self.axAttributeDetectForBrowsers.contains(bundleId)
+        guard isBrowserApp else { return false }
+
+        // Cached address bar context (Chromium/Firefox/Opera autocomplete pop-ups
+        // temporarily shift focus away from the bar — cache persists the state).
+        if let cached = cachedAddressBarInjection,
+           cachedAddressBarBundleId == bundleId,
+           cached.description.contains("Address Bar") {
+            return true
+        }
+        return isAddressBar(info: getFocusedElementInfo(), bundleId: bundleId)
+    }
     
     // MARK: - Window Title Detection
     
@@ -1827,45 +1889,13 @@ class AppBehaviorDetector {
             return .terminal
         }
         
-        // Browser apps - check if in address bar
+        // Browser apps: address bar vs content area dispatch via canonical helper.
+        // Shared with isInBrowserAddressBar() so all callers see the same answer.
         let isBrowserApp = Self.browserApps.contains(bundleId)
             || Self.firefoxBasedBrowsers.contains(bundleId)
             || Self.axAttributeDetectForBrowsers.contains(bundleId)
         if isBrowserApp {
-            // Safari: Use AX Identifier for accurate detection (avoids web content inputs)
-            if bundleId == "com.apple.Safari" || bundleId == "com.apple.SafariTechnologyPreview" {
-                if isSafariAddressBar(info: focusedInfo) {
-                    return .browserAddressBar
-                }
-                return .standard
-            }
-            
-            // Firefox-style address bar (detected via DOM ID or AX Description)
-            if Self.firefoxBasedBrowsers.contains(bundleId) || Self.axAttributeDetectForBrowsers.contains(bundleId) {
-                if isFirefoxStyleAddressBar(info: focusedInfo) {
-                    return .browserAddressBar
-                }
-                return .standard
-            }
-            
-            // Chromium-based browsers: Use AX Description for accurate detection
-            // This matches "Address and search bar" which is Chrome's Omnibox identifier
-            if isChromiumAddressBar(info: focusedInfo) {
-                return .browserAddressBar
-            }
-            
-            // Opera Speed Dial: AX returns Unknown role for address bar
-            if isOperaSpeedDialAddressBar(bundleId: bundleId, role: focusedInfo.role) {
-                return .browserAddressBar
-            }
-            
-            // Dia Browser address bar (AX Identifier: commandBarTextField)
-            if bundleId == "company.thebrowser.dia" && isDiaAddressBar(info: focusedInfo) {
-                return .browserAddressBar
-            }
-            
-            // Browser content area - treat as standard
-            return .standard
+            return isAddressBar(info: focusedInfo, bundleId: bundleId) ? .browserAddressBar : .standard
         }
         
         // Code editors

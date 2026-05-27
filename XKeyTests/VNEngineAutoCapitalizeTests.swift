@@ -251,4 +251,40 @@ class VNEngineAutoCapitalizeTests: XCTestCase {
         XCTAssertFalse(firstIsCaps(),
             "After toggling feature off then on, stale pending status should not leak through")
     }
+
+    // MARK: - Stale status across cursor move / reset
+
+    func testNoCapitalize_AfterCursorMoveFollowingPeriod() {
+        // Repro: user types "a." then moves cursor (mouse click / arrow keys),
+        // which triggers resetWithCursorMoved(). The pending upperCaseStatus from
+        // the period MUST be cleared — otherwise the next typed character at the
+        // new cursor location gets unexpectedly capitalized.
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+        _ = engine.processWordBreak(character: ".")
+        // At this point upperCaseStatus == 1 (pending).
+
+        engine.resetWithCursorMoved()
+
+        _ = engine.processKey(character: "b", keyCode: VietnameseData.KEY_B, isUppercase: false)
+
+        XCTAssertFalse(firstIsCaps(),
+            "After cursor move (reset), pending capitalize status must not leak to the new editing location")
+    }
+
+    func testCapitalize_PreservedAcrossPlainReset() {
+        // Plain reset() is a "soft" reset used by Tab, Forward Delete, and the
+        // Enter-with-empty-buffer path. Sentence context is intentionally
+        // preserved so the next typed character is still capitalized.
+        // Only resetWithCursorMoved() (mouse click / arrow keys / app switch)
+        // clears the pending status — see testNoCapitalize_AfterCursorMoveFollowingPeriod.
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+        _ = engine.processWordBreak(character: ".")
+
+        engine.reset()
+
+        _ = engine.processKey(character: "b", keyCode: VietnameseData.KEY_B, isUppercase: false)
+
+        XCTAssertTrue(firstIsCaps(),
+            "Plain reset() preserves pending capitalize — only cursor-moved reset clears it")
+    }
 }
