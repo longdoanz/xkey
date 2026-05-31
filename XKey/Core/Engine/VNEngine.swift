@@ -766,7 +766,20 @@ class VNEngine {
         // to avoid false positives after restoreLastTypingState()
         let rawInput = getRawInputStringForEnglishDetection()
         let customConsonantChars = Set(vCustomConsonants.compactMap { VietnameseData.char(for: $0) })
-        if rawInput.isDefinitelyNotVietnameseForRawInput(inputType: vInputType, customConsonants: customConsonantChars) {
+        // Adaptive accepts both Telex and VNI in one buffer, so vInputType reflects only
+        // the LAST keystroke. Validating the whole raw buffer against that single type would
+        // misjudge mixed sequences (e.g. a VNI "d9..." checked against Telex tables). Treat
+        // the buffer as English only when it is impossible under BOTH interpretations.
+        let isDefinitelyNotVietnamese: Bool
+        if vAdaptiveEnabled {
+            isDefinitelyNotVietnamese =
+                rawInput.isDefinitelyNotVietnameseForRawInput(inputType: 0, customConsonants: customConsonantChars)
+                && rawInput.isDefinitelyNotVietnameseForRawInput(inputType: 1, customConsonants: customConsonantChars)
+        } else {
+            isDefinitelyNotVietnamese =
+                rawInput.isDefinitelyNotVietnameseForRawInput(inputType: vInputType, customConsonants: customConsonantChars)
+        }
+        if isDefinitelyNotVietnamese {
             // ENHANCED LOGGING: Log full context when English pattern is detected
             // This helps debug buffer desync issues
             logCallback?("⚠️ ENGLISH PATTERN DETECTED:")

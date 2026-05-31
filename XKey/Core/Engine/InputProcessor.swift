@@ -44,7 +44,10 @@ class InputProcessor {
         case .simpleTelex1, .simpleTelex2:
             return processSimpleTelexKey(lowerChar, isUppercase: isUppercase)
         case .adaptive:
-            return processTelexKey(lowerChar, isUppercase: isUppercase)
+            // Accept both: digits route to VNI logic, every other key to Telex.
+            return lowerChar.isNumber
+                ? processVNIKey(lowerChar, isUppercase: isUppercase)
+                : processTelexKey(lowerChar, isUppercase: isUppercase)
         }
     }
     

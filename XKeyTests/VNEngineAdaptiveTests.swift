@@ -246,4 +246,53 @@ class VNEngineAdaptiveTests: XCTestCase {
         XCTAssertEqual(typeUpper([("A", VietnameseData.KEY_A, true), ("s", VietnameseData.KEY_S, false)]), "Á")
         XCTAssertEqual(typeUpper([("A", VietnameseData.KEY_A, true), ("1", VietnameseData.KEY_1, false)]), "Á")
     }
+
+    // MARK: - English detection across the per-keystroke type flip
+
+    func testAdaptive_VniMultiSyllable_NotEnglishDisabled() {
+        // A full Vietnamese word typed entirely with VNI keys must compose correctly in
+        // adaptive mode. vInputType reflects only the LAST keystroke, so when the trailing
+        // letters ("n", "g") flip it back to Telex, the digit-bearing raw buffer must NOT
+        // be validated against Telex tables alone and trip English detection.
+        // tiếng via VNI: t i e 6(ê) 1(acute) n g
+        XCTAssertEqual(typeAdaptive([
+            ("t", VietnameseData.KEY_T), ("i", VietnameseData.KEY_I), ("e", VietnameseData.KEY_E),
+            ("6", VietnameseData.KEY_6), ("1", VietnameseData.KEY_1),
+            ("n", VietnameseData.KEY_N), ("g", VietnameseData.KEY_G)
+        ]), "tiếng", "VNI-typed word must not be disabled as English in adaptive")
+        // Cross-check: the Telex spelling of the same word yields the same result.
+        // tiếng via Telex: t i e e(ê) s(acute) n g
+        XCTAssertEqual(typeAdaptive([
+            ("t", VietnameseData.KEY_T), ("i", VietnameseData.KEY_I), ("e", VietnameseData.KEY_E),
+            ("e", VietnameseData.KEY_E), ("s", VietnameseData.KEY_S),
+            ("n", VietnameseData.KEY_N), ("g", VietnameseData.KEY_G)
+        ]), "tiếng")
+    }
+
+    func testAdaptive_EnglishWordStillDetectedLiteral() {
+        // The both-tables check must not weaken English detection: "street" is impossible
+        // under BOTH Telex and VNI, so it stays literal.
+        XCTAssertEqual(typeAdaptive([
+            ("s", VietnameseData.KEY_S), ("t", VietnameseData.KEY_T), ("r", VietnameseData.KEY_R),
+            ("e", VietnameseData.KEY_E), ("e", VietnameseData.KEY_E), ("t", VietnameseData.KEY_T)
+        ]), "street", "impossible-under-both token must remain literal")
+    }
+
+    // MARK: - VNI remove-tone key (0) in adaptive
+
+    func testAdaptive_VniRemoveTone_0() {
+        // VNI '0' strips the tone. As a digit it routes to VNI even in adaptive.
+        // a + 1 (á) + 0 → a
+        XCTAssertEqual(typeAdaptive([
+            ("a", VietnameseData.KEY_A), ("1", VietnameseData.KEY_1), ("0", VietnameseData.KEY_0)
+        ]), "a", "VNI '0' must strip a VNI-applied tone in adaptive")
+    }
+
+    func testAdaptive_VniRemoveTone_StripsTelexTone() {
+        // Cross-convention: a Telex-applied tone removed by the VNI '0' key.
+        // a + s (á, Telex) + 0 (VNI remove) → a
+        XCTAssertEqual(typeAdaptive([
+            ("a", VietnameseData.KEY_A), ("s", VietnameseData.KEY_S), ("0", VietnameseData.KEY_0)
+        ]), "a", "VNI '0' must strip a Telex-applied tone in adaptive")
+    }
 }
