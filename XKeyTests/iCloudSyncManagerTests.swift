@@ -82,6 +82,44 @@ final class SyncCollectionPayloadTests: XCTestCase {
             .prunedTombstones(retention: 30 * 24 * 3600, now: now)
         XCTAssertEqual(payload.entries.count, 1)
     }
+
+    // MARK: Deterministic ordering (Window Title Rule cascade priority depends on it)
+
+    /// merged() must keep the local order even when the remote sends the same ids in a different
+    /// order and updates one of them. `Array(map.values)` used to scramble this on every merge.
+    func testMergePreservesLocalOrderWhenRemoteUpdatesAndReorders() {
+        let a = SyncEntry(id: "a", updatedAt: Date(timeIntervalSince1970: 100), data: Data("a".utf8))
+        let b = SyncEntry(id: "b", updatedAt: Date(timeIntervalSince1970: 100), data: Data("b".utf8))
+        let c = SyncEntry(id: "c", updatedAt: Date(timeIntervalSince1970: 100), data: Data("c".utf8))
+        let local = SyncCollectionPayload(entries: [a, b, c])
+        // Remote reorders and ships a newer "b".
+        let bNew = SyncEntry(id: "b", updatedAt: Date(timeIntervalSince1970: 200), data: Data("b2".utf8))
+        let remote = SyncCollectionPayload(entries: [bNew, c, a])
+        let merged = local.merged(with: remote)
+        XCTAssertEqual(merged.entries.map(\.id), ["a", "b", "c"], "local order must be preserved")
+        XCTAssertEqual(merged.entries[1].data, Data("b2".utf8), "newer remote value should still win")
+    }
+
+    /// New remote-only entries are appended after local ones, in their remote order — deterministic.
+    func testMergeAppendsNewRemoteEntriesAfterLocalInOrder() {
+        let a = SyncEntry(id: "a", data: Data())
+        let b = SyncEntry(id: "b", data: Data())
+        let c = SyncEntry(id: "c", data: Data())
+        let merged = SyncCollectionPayload(entries: [a]).merged(with: SyncCollectionPayload(entries: [b, c]))
+        XCTAssertEqual(merged.entries.map(\.id), ["a", "b", "c"])
+    }
+
+    /// Regression for the reported bug: deleting "test" on one Mac did not propagate. applyEnvelope
+    /// now builds the local payload as live + local tombstones, so a fresh local delete survives a
+    /// merge against a stale remote that still has the entry live (instead of being resurrected).
+    func testFreshLocalTombstoneSurvivesStaleRemoteLiveEntry() {
+        let freshLocalTomb = SyncEntry.tombstone(id: "test", at: Date(timeIntervalSince1970: 200))
+        let staleRemoteLive = SyncEntry(id: "test", updatedAt: Date(timeIntervalSince1970: 100), deleted: false, data: Data("x".utf8))
+        // local payload = live (none) + local tombstone, exactly as applyEnvelope constructs it.
+        let local = SyncCollectionPayload(entries: [freshLocalTomb])
+        let merged = local.merged(with: SyncCollectionPayload(entries: [staleRemoteLive]))
+        XCTAssertEqual(merged.liveEntries.count, 0, "a fresh local delete must not be resurrected by a stale remote live entry")
+    }
 }
 
 // MARK: - SyncEnvelope
@@ -312,5 +350,15 @@ final class iCloudSyncManagerTests: XCTestCase {
     func testPushDoesNothingWhenDisabled() {
         sut.pushAll()
         XCTAssertNil(mockStore.storage[SyncCategory.macros.rawValue])
+    }
+
+    // MARK: Sync now (bidirectional)
+
+    /// syncNow() must respect the enabled guard — a disabled manager writes nothing, same as push.
+    func testSyncNowDoesNothingWhenDisabled() {
+        sut.syncNow()
+        for c in SyncCategory.allCases {
+            XCTAssertNil(mockStore.storage[c.rawValue], "\(c) must not be written while sync is disabled")
+        }
     }
 }

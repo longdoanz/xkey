@@ -65,7 +65,7 @@ struct BackupRestoreSection: View {
                                 iCloudSyncStatusText(syncStatus, lastSyncDate: lastSyncDate)
                                 Spacer()
                                 Button(action: {
-                                    iCloudSyncManager.shared.pushAll()
+                                    iCloudSyncManager.shared.syncNow()
                                     syncStatus = iCloudSyncManager.shared.status
                                     lastSyncDate = iCloudSyncManager.shared.lastSyncDate
                                 }) {

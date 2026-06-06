@@ -303,6 +303,26 @@ final class iCloudSyncManager: NSObject {
         }
     }
 
+    /// Manual "Sync now" from the UI. Bidirectional: pull-merge every category FIRST so deletes and
+    /// edits made on other devices are adopted here, THEN push the merged result so our state
+    /// propagates back. The old behavior (push-only) overwrote a peer's tombstone with our still-live
+    /// entry — a delete made elsewhere never landed here, and the push un-deleted it for everyone.
+    func syncNow() {
+        guard isEnabled, !awaitingFirstEnableDecision else { return }
+        kvStore.synchronize()
+        pullMergeThenPushAll()
+    }
+
+    /// Pull-merge every category into local, then push the merged result back. Shared by the manual
+    /// "Sync now" button and the first-enable "merge" action — both need the same bidirectional pass
+    /// so a delete/edit from either side survives instead of one side clobbering the other.
+    private func pullMergeThenPushAll() {
+        for c in SyncCategory.allCases {
+            pullCategory(c, mode: .mergeWithLocal)
+            pushCategory(c)
+        }
+    }
+
     private enum PullMode { case mergeWithLocal, overwriteLocal }
 
     private func pullCategory(_ category: SyncCategory, mode: PullMode) {
@@ -388,10 +408,7 @@ final class iCloudSyncManager: NSObject {
 
     private func mergeAll() {
         // For collections: pull-merge, then push the merged result. For scalars: newer timestamp wins.
-        for c in SyncCategory.allCases {
-            pullCategory(c, mode: .mergeWithLocal)
-            pushCategory(c)
-        }
+        pullMergeThenPushAll()
     }
 
     // MARK: - Snapshot helpers (delegate to SharedSettings)
