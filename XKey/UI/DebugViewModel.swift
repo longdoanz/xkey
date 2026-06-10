@@ -12,7 +12,11 @@ import Combine
 class DebugViewModel: ObservableObject {
     @Published var statusText = "Status: Initializing..."
     @Published var logLines: [String] = []  // Changed from logText to array for better performance
-    @Published var isLoggingEnabled = true
+    @Published var isLoggingEnabled = true {
+        didSet {
+            loggingEnabledCallback?(isLoggingEnabled)
+        }
+    }
     @Published var isVerboseLogging = true {
         didSet {
             verboseLoggingCallback?(isVerboseLogging)
@@ -117,6 +121,7 @@ class DebugViewModel: ObservableObject {
     var readWordCallback: (() -> Void)?
     var alwaysOnTopCallback: ((Bool) -> Void)?
     var verboseLoggingCallback: ((Bool) -> Void)?
+    var loggingEnabledCallback: ((Bool) -> Void)?
     
     // MARK: - Computed Properties
     
@@ -165,8 +170,16 @@ class DebugViewModel: ObservableObject {
         
         let header = "=== XKey Debug Log ===\n\(versionString)\n\(osVersionString)\nStarted: \(timestamp)\nLog file: \(logFileURL.path)\n\n"
 
-        // Create/overwrite file with header
+        // Create/overwrite file with header. The atomic write replaces the
+        // file's inode, so the stale write handle must be dropped under the
+        // SAME lock hold — otherwise writeQueue can re-open the old inode
+        // between the close and the write, and every subsequent log line would
+        // silently go to the unlinked file.
+        writeLock.lock()
+        try? logFileHandle?.close()
+        logFileHandle = nil
         try? header.write(to: logFileURL, atomically: true, encoding: .utf8)
+        writeLock.unlock()
     }
     
     private func loadExistingLogs() {
@@ -177,15 +190,28 @@ class DebugViewModel: ObservableObject {
     
     // MARK: - Fire-and-Forget Logging (Write Only)
     
+    /// Shared formatter — DateFormatter.localizedString creates a new formatter
+    /// per call, far too expensive for per-keystroke logging.
+    private static let logTimestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .none
+        formatter.timeStyle = .medium
+        return formatter
+    }()
+
     /// Add a log event - writes directly to file, no UI blocking
     func logEvent(_ event: String) {
         guard isLoggingEnabled else { return }
-        
-        let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
-        let logLine = "[\(timestamp)] \(event)"
-        
-        // Write to file asynchronously (fire-and-forget)
-        writeToFileAsync(logLine)
+
+        // Timestamp is formatted on writeQueue (serial): DateFormatter is not
+        // thread-safe and logEvent is called concurrently from the main thread,
+        // DebugLogger and the distributed-notification listener.
+        let date = Date()
+        writeQueue.async { [weak self] in
+            guard let self = self else { return }
+            let timestamp = Self.logTimestampFormatter.string(from: date)
+            self.writeToFileSync("[\(timestamp)] \(event)\n")
+        }
     }
     
     /// Write to file asynchronously (non-blocking)
@@ -195,20 +221,35 @@ class DebugViewModel: ObservableObject {
         }
     }
     
+    /// Persistent write handle — opening/closing a FileHandle per log line costs
+    /// several syscalls each; with per-keystroke logging that adds up fast.
+    /// Guarded by writeLock. Dropped when the log file is re-created.
+    private var logFileHandle: FileHandle?
+
     /// Write to file synchronously (called from background queue)
     private func writeToFileSync(_ text: String) {
         writeLock.lock()
         defer { writeLock.unlock() }
-        
+
         guard let data = text.data(using: .utf8) else { return }
-        
+
         do {
-            let handle = try FileHandle(forWritingTo: logFileURL)
+            // Recover if the log file was deleted externally — a persistent
+            // handle would otherwise keep writing into the unlinked inode and
+            // never resume once the file reappears.
+            if logFileHandle != nil && !FileManager.default.fileExists(atPath: logFileURL.path) {
+                try? logFileHandle?.close()
+                logFileHandle = nil
+            }
+            if logFileHandle == nil {
+                logFileHandle = try FileHandle(forWritingTo: logFileURL)
+            }
+            guard let handle = logFileHandle else { return }
             handle.seekToEndOfFile()
             handle.write(data)
-            try handle.close()
         } catch {
-            // Ignore write errors to avoid blocking
+            // Open failed (file missing) — drop the line, retry next time
+            logFileHandle = nil
         }
     }
     

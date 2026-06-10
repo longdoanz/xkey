@@ -1,6 +1,40 @@
 import Foundation
 import AppKit
 
+/// Process-wide memo of NSSpellChecker verdicts.
+/// Each cache miss costs a synchronous XPC round-trip to the AppleSpell
+/// service (~0.1-1ms, 10-200ms under memory pressure), and the engine asks
+/// about the same strings constantly: every intermediate state of a word
+/// being typed ("ngh", "nghi", ...) that is not in the hunspell dictionary
+/// falls through to this check on every keystroke.
+/// Verdicts are stable for the app's lifetime: the app never calls
+/// learnWord/unlearnWord, and tier-1 (user dictionary) and tier-2 (hunspell)
+/// checks run BEFORE this fallback, so their changes never need to
+/// invalidate this cache. System-wide dictionary edits made in another app
+/// are picked up on next launch — acceptable for a spell-check hint.
+private enum NLSpellVerdictCache {
+    private static let maxEntries = 2048
+    private static var verdicts: [String: Bool] = [:]
+    private static let lock = NSLock()
+
+    static func verdict(for word: String) -> Bool? {
+        lock.lock()
+        defer { lock.unlock() }
+        return verdicts[word]
+    }
+
+    static func store(_ verdict: Bool, for word: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        if verdicts.count >= maxEntries {
+            // Simple full reset — refills within seconds of typing and avoids
+            // LRU bookkeeping on the hot path
+            verdicts.removeAll(keepingCapacity: true)
+        }
+        verdicts[word] = verdict
+    }
+}
+
 /// Extension for VNEngine to support spell checking
 extension VNEngine {
 
@@ -87,8 +121,14 @@ extension VNEngine {
     }
 
     /// Check if word is valid using macOS Natural Language framework
-    /// This serves as a fallback when word is not found in the custom dictionary
+    /// This serves as a fallback when word is not found in the custom dictionary.
+    /// Results are memoized (NLSpellVerdictCache) — the XPC round-trip to
+    /// AppleSpell is the single most expensive step on the spell-check path.
     private func isValidWordUsingNaturalLanguage(_ word: String) -> Bool {
+        if let cached = NLSpellVerdictCache.verdict(for: word) {
+            return cached
+        }
+
         // Use NLSpellChecker to check spelling
         let checker = NSSpellChecker.shared
 
@@ -98,6 +138,7 @@ extension VNEngine {
         // If range.location == NSNotFound, the word is correctly spelled
         let isCorrect = range.location == NSNotFound
 
+        NLSpellVerdictCache.store(isCorrect, for: word)
         return isCorrect
     }
 

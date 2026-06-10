@@ -82,10 +82,9 @@ class XKeyIMController: IMKInputController {
         // Initialize engine
         engine = VNEngine()
 
-        // Set up engine logging callback
-        engine.logCallback = { message in
-            IMKitDebugger.shared.log(message, category: "VNEngine")
-        }
+        // Set up engine logging callback (nil while logging is off — see
+        // updateEngineLogWiring)
+        updateEngineLogWiring()
 
         // Apply engine settings from loaded settings
         applySettings()
@@ -141,13 +140,32 @@ class XKeyIMController: IMKInputController {
         engine.updateSettings(engineSettings)
     }
     
+    /// Wire or unwire the engine log closure.
+    /// While logging is off the callback is nil, so the engine skips building
+    /// log strings entirely (they run on every keystroke; optional chaining
+    /// short-circuits argument evaluation). Mirrors KeyboardEventHandler's
+    /// updateEngineLogWiring in the main app.
+    private func updateEngineLogWiring() {
+        if DebugLogger.shared.isLoggingEnabled {
+            engine.logCallback = { message in
+                IMKitDebugger.shared.log(message, category: "VNEngine")
+            }
+        } else {
+            engine.logCallback = nil
+        }
+    }
+
     /// Reload settings (called when settings change)
     private func reloadSettings() {
+        // Drop SharedSettings' in-process cache first — don't rely on its own
+        // distributed-notification observer having fired before this one.
+        SharedSettings.shared.invalidateCache()
         settings.reload()
         applySettings()
-        
+
         // Sync debug logging state - respect user's debug mode toggle
         DebugLogger.shared.isLoggingEnabled = settings.debugModeEnabled
+        updateEngineLogWiring()
     }
     
     // MARK: - IMKInputController Overrides

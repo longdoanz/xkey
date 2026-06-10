@@ -99,6 +99,10 @@ class DebugWindowController: NSWindowController, DebugWindowControllerProtocol, 
     func setupVerboseLoggingCallback(_ callback: @escaping (Bool) -> Void) {
         viewModel.verboseLoggingCallback = callback
     }
+
+    func setupLoggingEnabledCallback(_ callback: @escaping (Bool) -> Void) {
+        viewModel.loggingEnabledCallback = callback
+    }
     
     func updateStatus(_ status: String) {
         viewModel.updateStatus(status)
