@@ -1306,11 +1306,7 @@ struct AddRuleSheet: View {
                 }
             }
             .padding(.vertical, 8)
-            .padding(.leading, 16)
-            .padding(.trailing, 28)
         }
-        .padding(.leading, -16)
-        .padding(.trailing, -28)
     }
     
     private func loadExistingRule(_ rule: WindowTitleRule) {

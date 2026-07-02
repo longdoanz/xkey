@@ -2545,20 +2545,26 @@ class AppBehaviorDetector {
             )
         }
 
-        // Firefox-based browsers - AX degraded fallback (role = AXWindow)
-        // When AX query fails on Firefox, the focused element returns AXWindow (window-level)
-        // instead of the actual element (AXTextField for address bar, nil for content area).
-        // We can't tell if user is in address bar or content area, so use .fast with
-        // needsEmptyCharPrefix flag. This sends U+202F before backspaces to break autocomplete:
+        // Browsers - AX degraded fallback (role = Unknown/nil/AXWindow)
+        // Covers both Chromium/WebKit (browserApps) and Firefox-based browsers, which
+        // may not expose the accessibility tree, leaving the focused element degraded:
+        //   - Firefox: AX query failure returns AXWindow (window-level) instead of the
+        //     real element (AXTextField for address bar, nil for content area).
+        //   - Arc (company.thebrowser.Browser) & others: address bar reports role=Unknown,
+        //     so isChromiumAddressBar() can't detect it at Priority 0.5.
+        // Without the empty-char-prefix, the first backspace gets eaten by the highlighted
+        // inline autocomplete suggestion instead of deleting the real char, producing
+        // artifacts like "goõ" instead of "gõ". .fast + U+202F is safe in both surfaces:
         // - Address bar: U+202F breaks autocomplete → extra backspace removes it → works ✅
         // - Content area: U+202F is invisible → extra backspace removes it → works ✅
-        if Self.firefoxBasedBrowsers.contains(bundleId) {
-            if role == "AXWindow" {
+        if Self.browserApps.contains(bundleId) || Self.firefoxBasedBrowsers.contains(bundleId) {
+            let isDegradedAX = role == nil || role == "Unknown" || role == "AXUnknown" || role == "AXWindow"
+            if isDegradedAX {
                 return InjectionMethodInfo(
                     method: .fast,
                     delays: InjectionMethod.fast.defaultDelays,
                     textSendingMethod: .chunked,
-                    description: "Firefox (AX degraded fallback)",
+                    description: "Browser (AX degraded fallback)",
                     needsEmptyCharPrefix: true
                 )
             }

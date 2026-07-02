@@ -270,6 +270,138 @@ class ToggleWindowTitleRulesTests: XCTestCase {
         XCTAssertNil(decoded.inputMethodPolicy,
             "Decoding a rule whose JSON has no inputMethodPolicy key must yield nil")
     }
+
+    // MARK: - Empty Char Prefix Override Tests
+
+    func testWindowTitleRuleEmptyCharPrefix_RoundTripsThroughCodable() throws {
+        let rule = WindowTitleRule(
+            name: "Force empty char prefix",
+            bundleIdPattern: "com.example.App",
+            titlePattern: "Editor",
+            matchMode: .contains,
+            needsEmptyCharPrefix: true
+        )
+
+        let data = try JSONEncoder().encode(rule)
+        let decoded = try JSONDecoder().decode(WindowTitleRule.self, from: data)
+
+        XCTAssertEqual(decoded.needsEmptyCharPrefix, true)
+    }
+
+    func testWindowTitleRuleEmptyCharPrefixFalse_RoundTripsThroughCodable() throws {
+        // false is a meaningful "force disable" override, distinct from nil (inherit).
+        let rule = WindowTitleRule(
+            name: "Force disable empty char prefix",
+            bundleIdPattern: "com.example.App",
+            titlePattern: "Editor",
+            matchMode: .contains,
+            needsEmptyCharPrefix: false
+        )
+
+        let data = try JSONEncoder().encode(rule)
+        let decoded = try JSONDecoder().decode(WindowTitleRule.self, from: data)
+
+        XCTAssertEqual(decoded.needsEmptyCharPrefix, false,
+            "false must survive round-trip and not be conflated with nil")
+    }
+
+    func testWindowTitleRule_OmitsEmptyCharPrefixWhenNil_AndDecodesAbsentKeyAsNil() throws {
+        // Backward compatibility: a rule without an override must not emit the key,
+        // and rules saved before this feature (no key) must decode with nil (inherit).
+        let rule = WindowTitleRule(
+            name: "No empty char prefix override",
+            bundleIdPattern: "com.example.App",
+            titlePattern: "",
+            matchMode: .contains
+        )
+
+        let data = try JSONEncoder().encode(rule)
+        let json = String(data: data, encoding: .utf8) ?? ""
+        XCTAssertFalse(json.contains("needsEmptyCharPrefix"),
+            "Encoder must omit needsEmptyCharPrefix when nil (encodeIfPresent)")
+
+        let decoded = try JSONDecoder().decode(WindowTitleRule.self, from: data)
+        XCTAssertNil(decoded.needsEmptyCharPrefix,
+            "Decoding a rule whose JSON has no needsEmptyCharPrefix key must yield nil")
+    }
+
+    func testMergedRuleResult_EmptyCharPrefixLaterRuleOverridesEarlierRule() {
+        let baseRule = WindowTitleRule(
+            name: "Base enable",
+            bundleIdPattern: "com.example.App",
+            titlePattern: "",
+            matchMode: .contains,
+            needsEmptyCharPrefix: true
+        )
+        let specificRule = WindowTitleRule(
+            name: "Specific disable",
+            bundleIdPattern: "com.example.App",
+            titlePattern: "Editor",
+            matchMode: .contains,
+            needsEmptyCharPrefix: false
+        )
+
+        var result = MergedRuleResult()
+        result.merge(from: baseRule)
+        result.merge(from: specificRule)
+
+        XCTAssertEqual(result.needsEmptyCharPrefix, false,
+            "A later matching rule must override the earlier empty-char-prefix value (cascade order)")
+    }
+
+    func testMergedRuleResult_EmptyCharPrefixNilDoesNotOverrideEarlierValue() {
+        let enableRule = WindowTitleRule(
+            name: "Sets empty char prefix",
+            bundleIdPattern: "com.example.App",
+            titlePattern: "",
+            matchMode: .contains,
+            needsEmptyCharPrefix: true
+        )
+        let noOverrideRule = WindowTitleRule(
+            name: "No override",
+            bundleIdPattern: "com.example.App",
+            titlePattern: "Editor",
+            matchMode: .contains,
+            needsEmptyCharPrefix: nil
+        )
+
+        var result = MergedRuleResult()
+        result.merge(from: enableRule)
+        result.merge(from: noOverrideRule)
+
+        XCTAssertEqual(result.needsEmptyCharPrefix, true,
+            "A later rule with nil override must not clear an earlier rule's empty-char-prefix value")
+    }
+
+    func testMergedRuleResult_DefaultsToNilEmptyCharPrefix() {
+        let empty = MergedRuleResult()
+        XCTAssertNil(empty.needsEmptyCharPrefix,
+            "A fresh MergedRuleResult should carry no empty-char-prefix override")
+
+        let ruleWithoutOverride = WindowTitleRule(
+            name: "No override",
+            bundleIdPattern: "com.example.App",
+            titlePattern: "",
+            matchMode: .contains
+        )
+        var merged = MergedRuleResult()
+        merged.merge(from: ruleWithoutOverride)
+        XCTAssertNil(merged.needsEmptyCharPrefix,
+            "Merging a rule without an override must leave the result's value nil")
+    }
+
+    func testInjectionMethodInfo_DefaultsToNoEmptyCharPrefix() {
+        // Priority 1/2 fall back to `false` when no rule sets the override; verify the
+        // InjectionMethodInfo default matches that contract.
+        let info = InjectionMethodInfo(
+            method: .fast,
+            delays: (2000, 5000, 2000),
+            textSendingMethod: .chunked,
+            description: "test"
+        )
+        XCTAssertFalse(info.needsEmptyCharPrefix,
+            "InjectionMethodInfo must default needsEmptyCharPrefix to false")
+    }
 }
 
 // MARK: - EventTapManager Toggle Hotkey Slot Tests
