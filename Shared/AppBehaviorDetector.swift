@@ -1024,6 +1024,24 @@ class AppBehaviorDetector {
         ),
 
         // ============================================
+        // Messenger Web (ChatGPT Atlas)
+        // ============================================
+        
+        // Messenger Web has a suggestion popup in ChatGPT Atlas similar to Telegram Web.
+        // Fast + chunked replacement can cause typed Vietnamese text to disappear
+        // after adding tone marks. Selection + oneByOne avoids the popup/backspace race.
+        WindowTitleRule(
+            name: "Messenger Web (Atlas)",
+            bundleIdPattern: "com.openai.atlas",
+            titlePattern: "Messenger",
+            matchMode: .contains,
+            injectionMethod: .selection,
+            injectionDelays: [3000, 8000, 3000],
+            textSendingMethod: .oneByOne,
+            description: "Messenger Web in ChatGPT Atlas - selection method to avoid popup dismiss on backspace"
+        ),
+
+        // ============================================
         // Microsoft Word for the web (Word Online, all browsers)
         // ============================================
         //
@@ -1128,6 +1146,7 @@ class AppBehaviorDetector {
         "com.firstversionist.polypane",
         "ai.perplexity.comet",
         "com.duckduckgo.macos.browser",
+        "com.openai.atlas",
         // Helium (Chromium-based)
         "net.imput.helium"
     ]
