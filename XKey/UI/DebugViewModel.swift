@@ -382,61 +382,65 @@ class DebugViewModel: ObservableObject {
         lines.append("Code Table: \(codeTableName)")
         lines.append("")
         
+        func stateLabel(_ isOn: Bool) -> String {
+            isOn ? "ON" : "⚠️ OFF"
+        }
+        
         // Key settings
         lines.append("[Input Settings]")
-        lines.append("  Modern Style: \(settings.modernStyle ? "ON" : "OFF")")
-        lines.append("  Spell Check: \(settings.spellCheckEnabled ? "ON" : "OFF")")
+        lines.append("  Modern Style: \(stateLabel(settings.modernStyle))")
+        lines.append("  Spell Check: \(stateLabel(settings.spellCheckEnabled))")
         let consonantsStr = settings.customConsonants
-        lines.append("  Custom Consonants: \(consonantsStr.isEmpty ? "OFF" : consonantsStr)")
-        lines.append("  Upper Case First Char: \(settings.upperCaseFirstChar ? "ON" : "OFF")")
-        lines.append("  Capitalize Only After Space: \(settings.capitalizeOnlyAfterSpace ? "ON" : "OFF")")
-        lines.append("  Undo Typing: \(settings.undoTypingEnabled ? "ON" : "OFF")")
-        lines.append("  Beep on Toggle: \(settings.beepOnToggle ? "ON" : "OFF")")
+        lines.append("  Custom Consonants: \(consonantsStr.isEmpty ? "⚠️ OFF" : consonantsStr)")
+        lines.append("  Upper Case First Char: \(stateLabel(settings.upperCaseFirstChar))")
+        lines.append("  Capitalize Only After Space: \(stateLabel(settings.capitalizeOnlyAfterSpace))")
+        lines.append("  Undo Typing: \(stateLabel(settings.undoTypingEnabled))")
+        lines.append("  Beep on Toggle: \(stateLabel(settings.beepOnToggle))")
         lines.append("")
         
         // Quick Telex
         lines.append("[Quick Telex]")
-        lines.append("  Quick Telex (cc->ch): \(settings.quickTelexEnabled ? "ON" : "OFF")")
-        lines.append("  Quick Start Consonant: \(settings.quickStartConsonantEnabled ? "ON" : "OFF")")
-        lines.append("  Quick End Consonant: \(settings.quickEndConsonantEnabled ? "ON" : "OFF")")
+        lines.append("  Quick Telex (cc->ch): \(stateLabel(settings.quickTelexEnabled))")
+        lines.append("  Quick Start Consonant: \(stateLabel(settings.quickStartConsonantEnabled))")
+        lines.append("  Quick End Consonant: \(stateLabel(settings.quickEndConsonantEnabled))")
         lines.append("")
         
         // Spell check options
         lines.append("[Spell Check Options]")
-        lines.append("  Restore if Wrong: \(settings.restoreIfWrongSpelling ? "ON" : "OFF")")
-        lines.append("  Instant Restore: \(settings.instantRestoreOnWrongSpelling ? "ON" : "OFF")")
+        lines.append("  Restore if Wrong: \(stateLabel(settings.restoreIfWrongSpelling))")
+        lines.append("  Instant Restore: \(stateLabel(settings.instantRestoreOnWrongSpelling))")
         lines.append("")
         
         // Macro
         lines.append("[Macro]")
-        lines.append("  Macro Enabled: \(settings.macroEnabled ? "ON" : "OFF")")
-        lines.append("  Macro in English: \(settings.macroInEnglishMode ? "ON" : "OFF")")
-        lines.append("  Auto Caps Macro: \(settings.autoCapsMacro ? "ON" : "OFF")")
-        lines.append("  Add Space After: \(settings.addSpaceAfterMacro ? "ON" : "OFF")")
+        lines.append("  Macro Enabled: \(stateLabel(settings.macroEnabled))")
+        lines.append("  Macro in English: \(stateLabel(settings.macroInEnglishMode))")
+        lines.append("  Auto Caps Macro: \(stateLabel(settings.autoCapsMacro))")
+        lines.append("  Add Space After: \(stateLabel(settings.addSpaceAfterMacro))")
         lines.append("")
         
         // Smart Switch
         lines.append("[Smart Switch]")
-        lines.append("  Smart Switch: \(settings.smartSwitchEnabled ? "ON" : "OFF")")
+        lines.append("  Smart Switch: \(stateLabel(settings.smartSwitchEnabled))")
         lines.append("")
         
         // IMKit
         lines.append("[IMKit]")
-        lines.append("  Use Marked Text: \(settings.imkitUseMarkedText ? "ON" : "OFF")")
+        lines.append("  Use Marked Text: \(stateLabel(settings.imkitUseMarkedText))")
         lines.append("")
         
         // Toolbar
         lines.append("[Toolbar]")
-        lines.append("  Temp Off Toolbar: \(settings.tempOffToolbarEnabled ? "ON" : "OFF")")
+        lines.append("  Temp Off Toolbar: \(stateLabel(settings.tempOffToolbarEnabled))")
         lines.append("")
         
         // Translation
         lines.append("[Translation]")
-        lines.append("  Translation: \(settings.translationEnabled ? "ON" : "OFF")")
+        lines.append("  Translation: \(stateLabel(settings.translationEnabled))")
         lines.append("  Source Language: \(settings.translationSourceLanguage)")
         lines.append("  Target Language: \(settings.translationTargetLanguage)")
-        lines.append("  Replace Original: \(settings.translationReplaceOriginal ? "ON" : "OFF")")
-        lines.append("  Toolbar: \(settings.translationToolbarEnabled ? "ON" : "OFF")")
+        lines.append("  Replace Original: \(stateLabel(settings.translationReplaceOriginal))")
+        lines.append("  Toolbar: \(stateLabel(settings.translationToolbarEnabled))")
         lines.append("")
         
         // Excluded Apps
@@ -453,10 +457,10 @@ class DebugViewModel: ObservableObject {
         
         // Toggle Rules
         lines.append("[Toggle Rules]")
-        lines.append("  Exclusion Rules: \(settings.exclusionRulesEnabled ? "ON" : "OFF")")
+        lines.append("  Exclusion Rules: \(stateLabel(settings.exclusionRulesEnabled))")
         let exclHotkey = Hotkey(keyCode: settings.toggleExclusionHotkeyCode, modifiers: ModifierFlags(rawValue: settings.toggleExclusionHotkeyModifiers))
         lines.append("  Exclusion Hotkey: \(exclHotkey.keyCode != 0 ? exclHotkey.displayString : "(not set)")")
-        lines.append("  Window Title Rules: \(settings.windowTitleRulesEnabled ? "ON" : "OFF")")
+        lines.append("  Window Title Rules: \(stateLabel(settings.windowTitleRulesEnabled))")
         let wtrHotkey = Hotkey(keyCode: settings.toggleWindowRulesHotkeyCode, modifiers: ModifierFlags(rawValue: settings.toggleWindowRulesHotkeyModifiers))
         lines.append("  Window Rules Hotkey: \(wtrHotkey.keyCode != 0 ? wtrHotkey.displayString : "(not set)")")
         

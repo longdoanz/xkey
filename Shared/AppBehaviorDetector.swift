@@ -1024,21 +1024,22 @@ class AppBehaviorDetector {
         ),
 
         // ============================================
-        // Messenger Web (ChatGPT Atlas)
+        // Meta Chat Web (ChatGPT Atlas)
         // ============================================
         
-        // Messenger Web has a suggestion popup in ChatGPT Atlas similar to Telegram Web.
+        // Meta chat surfaces in ChatGPT Atlas (Messenger page and Facebook floating chat)
+        // have suggestion/contenteditable behavior similar to Telegram Web.
         // Fast + chunked replacement can cause typed Vietnamese text to disappear
         // after adding tone marks. Selection + oneByOne avoids the popup/backspace race.
         WindowTitleRule(
-            name: "Messenger Web (Atlas)",
+            name: "Meta Chat Web (Atlas)",
             bundleIdPattern: "com.openai.atlas",
-            titlePattern: "Messenger",
-            matchMode: .contains,
+            titlePattern: "Facebook|Messenger",
+            matchMode: .regex,
             injectionMethod: .selection,
             injectionDelays: [3000, 8000, 3000],
             textSendingMethod: .oneByOne,
-            description: "Messenger Web in ChatGPT Atlas - selection method to avoid popup dismiss on backspace"
+            description: "Meta chat in ChatGPT Atlas - selection method to avoid popup/backspace race"
         ),
 
         // ============================================
@@ -1765,6 +1766,10 @@ class AppBehaviorDetector {
     /// 3. The detection logic (string comparisons) is very fast
     /// 4. Simpler code without cache = fewer bugs
     func findMatchingRule(focusedInfo: FocusedElementInfo? = nil) -> WindowTitleRule? {
+        // Respect the master Window Title Rules switch for debug/single-rule lookup too.
+        // Otherwise logs can show a matched rule that the real merged-rule path ignores.
+        guard windowTitleRulesEnabled else { return nil }
+
         guard let bundleId = getCurrentBundleId() else {
             return nil
         }

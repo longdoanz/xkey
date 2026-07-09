@@ -99,6 +99,46 @@ class ToggleWindowTitleRulesTests: XCTestCase {
         XCTAssertTrue(rules.isEmpty,
             "findAllMatchingRules() should return empty array when windowTitleRulesEnabled is false, got \(rules.count) rules")
     }
+
+    /// Verify that debug/single-rule lookup also respects the master switch.
+    /// When disabled, debug logs must not show a rule that cannot actually apply.
+    func testFindMatchingRule_ReturnsNil_WhenDisabled() {
+        let detector = AppBehaviorDetector.shared
+        let savedState = detector.windowTitleRulesEnabled
+        let savedCustomRules = detector.getCustomRules()
+        defer {
+            detector.windowTitleRulesEnabled = savedState
+            detector.reorderCustomRules(savedCustomRules)
+        }
+
+        detector.windowTitleRulesEnabled = false
+        detector.reorderCustomRules([
+            WindowTitleRule(
+                name: "Any Window Debug Rule",
+                bundleIdPattern: "*",
+                titlePattern: "",
+                matchMode: .contains,
+                injectionMethod: .selection
+            )
+        ])
+
+        XCTAssertNil(detector.findMatchingRule(),
+            "findMatchingRule() should return nil when windowTitleRulesEnabled is false, so debug logs do not show disabled rules")
+    }
+
+    /// Verify the built-in Meta chat rule covers Messenger and Facebook window titles.
+    func testBuiltInMetaChatRule_CoversMessengerAndFacebookTitles() {
+        let rule = AppBehaviorDetector.builtInWindowTitleRules.first { $0.name == "Meta Chat Web (Atlas)" }
+
+        XCTAssertNotNil(rule, "Built-in Meta Chat Web (Atlas) rule should exist")
+        XCTAssertEqual(rule?.bundleIdPattern, "com.openai.atlas")
+        XCTAssertEqual(rule?.titlePattern, "Facebook|Messenger")
+        XCTAssertEqual(rule?.matchMode, .regex)
+        XCTAssertEqual(rule?.injectionMethod, .selection)
+        XCTAssertEqual(rule?.textSendingMethod, .oneByOne)
+        XCTAssertTrue(rule?.matches(bundleId: "com.openai.atlas", windowTitle: "Messenger", axInfo: nil) ?? false)
+        XCTAssertTrue(rule?.matches(bundleId: "com.openai.atlas", windowTitle: "Facebook", axInfo: nil) ?? false)
+    }
     
     /// Verify toggle round-trip
     func testWindowTitleRulesEnabled_RoundTrip() {
@@ -606,6 +646,23 @@ class ToggleRulesDebugConfigTests: XCTestCase {
         XCTAssertTrue(hasWTRLine,
             "Config should show Window Title Rules state")
         
+        viewModel.stopAllTimers()
+    }
+
+    /// Verify OFF states are highlighted to make disabled settings easier to notice in logs.
+    func testDebugConfig_HighlightsOffStatesWithWarningEmoji() {
+        let settings = SharedSettings.shared
+        let savedWindowTitleRulesEnabled = settings.windowTitleRulesEnabled
+        defer { settings.windowTitleRulesEnabled = savedWindowTitleRulesEnabled }
+        settings.windowTitleRulesEnabled = false
+
+        let viewModel = DebugViewModel()
+        let lines = viewModel.generateConfigSummary()
+
+        let hasHighlightedOffState = lines.contains { $0.contains("Window Title Rules: ⚠️ OFF") }
+        XCTAssertTrue(hasHighlightedOffState,
+            "Config summary should highlight OFF states with a warning emoji. Lines: \(lines)")
+
         viewModel.stopAllTimers()
     }
     
