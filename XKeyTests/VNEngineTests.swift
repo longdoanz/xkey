@@ -1176,7 +1176,31 @@ class VNEngineTests: XCTestCase {
         let rawInput = engine.getRawInputStringForEnglishDetection()
         XCTAssertEqual(rawInput, "ly", "getRawInputStringForEnglishDetection() should return 'ly', not 'lyy' (no duplicate keystrokes)")
     }
-    
+
+    // MARK: - keyCodeToChar (canonical map delegation)
+
+    /// keyCodeToChar was refactored from a per-call dictionary literal to a lookup into the
+    /// canonical VietnameseData.keyCodeToCharacterMap. Guard that the observable mapping is
+    /// unchanged and stays in sync with that single source of truth.
+    func testKeyCodeToChar_KnownKeysMapToExpectedCharacters() {
+        XCTAssertEqual(VNEngine.keyCodeToChar(VietnameseData.KEY_A), "a")
+        XCTAssertEqual(VNEngine.keyCodeToChar(VietnameseData.KEY_Z), "z")
+        XCTAssertEqual(VNEngine.keyCodeToChar(VietnameseData.KEY_Y), "y")
+        XCTAssertEqual(VNEngine.keyCodeToChar(VietnameseData.KEY_SPACE), " ")
+        XCTAssertEqual(VNEngine.keyCodeToChar(VietnameseData.KEY_1), "1")
+    }
+
+    func testKeyCodeToChar_MatchesCanonicalMap() {
+        for (keyCode, char) in VietnameseData.keyCodeToCharacterMap {
+            XCTAssertEqual(VNEngine.keyCodeToChar(keyCode), char,
+                           "keyCodeToChar must delegate to the canonical map for 0x\(String(keyCode, radix: 16))")
+        }
+    }
+
+    func testKeyCodeToChar_UnmappedKeyReturnsNil() {
+        XCTAssertNil(VNEngine.keyCodeToChar(0xFF), "Unmapped key code should return nil")
+    }
+
     /// Test similar words that should not be detected as English
     func testTelex_SimpleVietnameseWords_NotEnglishPattern() {
         // Test "mỹ" = m-y-x
