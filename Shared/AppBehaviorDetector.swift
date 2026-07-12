@@ -308,12 +308,31 @@ enum WindowTitleMatchMode: String, Codable, CaseIterable {
         case .exact:
             return lowercaseTitle == lowercasePattern
         case .regex:
-            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+            guard let regex = Self.compiledRegex(for: pattern) else {
                 return false
             }
             let range = NSRange(title.startIndex..., in: title)
             return regex.firstMatch(in: title, options: [], range: range) != nil
         }
+    }
+
+    /// Cache of compiled regexes keyed by pattern, so repeated window-title matches
+    /// don't recompile the same NSRegularExpression. Guarded by a lock because rule
+    /// evaluation can run off the main thread (injection-detection path).
+    private static var regexCache: [String: NSRegularExpression] = [:]
+    private static let regexCacheLock = NSLock()
+
+    private static func compiledRegex(for pattern: String) -> NSRegularExpression? {
+        regexCacheLock.lock()
+        defer { regexCacheLock.unlock() }
+        if let cached = regexCache[pattern] {
+            return cached
+        }
+        guard let compiled = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+            return nil
+        }
+        regexCache[pattern] = compiled
+        return compiled
     }
 }
 
