@@ -1778,8 +1778,36 @@ class VNEngineTests: XCTestCase {
                        "aa should still produce 'â' — only 2 identical vowels (below threshold)")
     }
 
+    // MARK: - Custom Consonants: cached Character set (perf)
+
+    /// vCustomConsonants is now mirrored into a cached `customConsonantChars` Set via didSet
+    /// (so the per-keystroke English-detection path doesn't rebuild it every key). Verify the
+    /// cache tracks the keycode set, including reassignment (the invalidation path).
+    func testCustomConsonantChars_CacheTracksReassignment() {
+        engine.reset()
+
+        // Default is empty.
+        XCTAssertTrue(engine.customConsonantChars.isEmpty,
+                      "cache should start empty like vCustomConsonants")
+
+        // Assign a set → cache reflects the Character form.
+        engine.vCustomConsonants = [VietnameseData.KEY_Z, VietnameseData.KEY_F]
+        XCTAssertEqual(engine.customConsonantChars, Set<Character>(["z", "f"]),
+                       "cache should reflect assigned keycodes as characters")
+
+        // Reassign a different set → cache must invalidate and reflect the NEW value.
+        engine.vCustomConsonants = [VietnameseData.KEY_W]
+        XCTAssertEqual(engine.customConsonantChars, Set<Character>(["w"]),
+                       "cache must update on reassignment, not keep the previous set")
+
+        // Reassign back to empty → cache clears.
+        engine.vCustomConsonants = []
+        XCTAssertTrue(engine.customConsonantChars.isEmpty,
+                      "cache must clear when vCustomConsonants is emptied")
+    }
+
     // MARK: - Custom Consonants: parseCustomConsonants Utility Tests
-    
+
     /// Test parsing a valid comma-separated string into Set<UInt16>
     func testParseCustomConsonants_ValidString() {
         let result = VietnameseData.parseCustomConsonants("Z,F,W,J,K")
