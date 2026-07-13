@@ -2910,6 +2910,63 @@ class VNEngineTests: XCTestCase {
         assertUppercaseAbbreviation(secondDIsUppercase: false, finalChar: "N", finalKey: VietnameseData.KEY_N, expected: "ĐN")
     }
 
+    /// REGRESSION (Vietnamese-first): all-caps abbreviations with Đ in ANY position
+    /// (HĐ, GĐ, PGĐ, BLĐ, LĐBĐ, HĐQT) or longer than two letters (ĐHQG) must stay
+    /// composed on word break instead of restoring to raw input (HDD, GDD, ...).
+    func testTyping_DStrokeAbbreviation_AnyPosition_StaysComposedOnWordBreak() {
+        func assertAbbreviation(_ keys: [(Character, UInt16)], expected: String, file: StaticString = #filePath, line: UInt = #line) {
+            engine.reset()
+            for (char, key) in keys {
+                _ = engine.processKey(character: char, keyCode: key, isUppercase: true)
+            }
+            XCTAssertEqual(engine.getCurrentWord(), expected, file: file, line: line)
+
+            let breakResult = engine.processWordBreak(character: " ")
+            XCTAssertFalse(breakResult.shouldConsume, "\(expected) must not restore to raw input on word break", file: file, line: line)
+        }
+
+        let D = VietnameseData.KEY_D
+        assertAbbreviation([("H", VietnameseData.KEY_H), ("D", D), ("D", D)], expected: "HĐ")
+        assertAbbreviation([("G", VietnameseData.KEY_G), ("D", D), ("D", D)], expected: "GĐ")
+        assertAbbreviation([("P", VietnameseData.KEY_P), ("G", VietnameseData.KEY_G), ("D", D), ("D", D)], expected: "PGĐ")
+        assertAbbreviation([("B", VietnameseData.KEY_B), ("L", VietnameseData.KEY_L), ("D", D), ("D", D)], expected: "BLĐ")
+        assertAbbreviation([("L", VietnameseData.KEY_L), ("D", D), ("D", D), ("B", VietnameseData.KEY_B), ("D", D), ("D", D)], expected: "LĐBĐ")
+        assertAbbreviation([("H", VietnameseData.KEY_H), ("D", D), ("D", D), ("Q", VietnameseData.KEY_Q), ("T", VietnameseData.KEY_T)], expected: "HĐQT")
+        assertAbbreviation([("D", D), ("D", D), ("H", VietnameseData.KEY_H), ("Q", VietnameseData.KEY_Q), ("G", VietnameseData.KEY_G)], expected: "ĐHQG")
+    }
+
+    /// UNIT (Vietnamese-first): the spell-check whitelist must accept all-caps
+    /// abbreviations containing Đ at ANY position and ANY length ≥ 2, so they are
+    /// never auto-restored to raw input. Mixed-case and lowercase words must still
+    /// follow the normal spell-check path.
+    func testSpellCheck_DStrokeAbbreviationWhitelist_AnyPositionAnyLength() {
+        // Đ at start (existing behavior, must keep working)
+        XCTAssertTrue(engine.isDefaultDStrokeAbbreviation("ĐN"))
+        XCTAssertTrue(engine.isDefaultDStrokeAbbreviation("ĐL"))
+
+        // Đ at end
+        XCTAssertTrue(engine.isDefaultDStrokeAbbreviation("HĐ"))
+        XCTAssertTrue(engine.isDefaultDStrokeAbbreviation("GĐ"))
+        XCTAssertTrue(engine.isDefaultDStrokeAbbreviation("PGĐ"))
+        XCTAssertTrue(engine.isDefaultDStrokeAbbreviation("BLĐ"))
+
+        // Đ in the middle / multiple Đ
+        XCTAssertTrue(engine.isDefaultDStrokeAbbreviation("LĐBĐ"))
+        XCTAssertTrue(engine.isDefaultDStrokeAbbreviation("HĐQT"))
+
+        // Đ at start, longer than two letters
+        XCTAssertTrue(engine.isDefaultDStrokeAbbreviation("ĐHQG"))
+
+        // Must NOT match: no Đ, lowercase, mixed case, too short, non-letters
+        XCTAssertFalse(engine.isDefaultDStrokeAbbreviation("HD"))
+        XCTAssertFalse(engine.isDefaultDStrokeAbbreviation("ABC"))
+        XCTAssertFalse(engine.isDefaultDStrokeAbbreviation("hđ"))
+        XCTAssertFalse(engine.isDefaultDStrokeAbbreviation("Đen"))
+        XCTAssertFalse(engine.isDefaultDStrokeAbbreviation("Đ"))
+        XCTAssertFalse(engine.isDefaultDStrokeAbbreviation("HĐ1"))
+        XCTAssertFalse(engine.isDefaultDStrokeAbbreviation(""))
+    }
+
     /// REVIEW: a tone letter after vowel+k behaves like the existing vowel+t case
     /// (cats→cát). Final-k introduces NO new English-handling class; English words are
     /// handled uniformly by auto-restore / the user dictionary, same as before.

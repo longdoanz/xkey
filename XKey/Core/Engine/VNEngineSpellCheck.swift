@@ -58,16 +58,13 @@ extension VNEngine {
         return false
     }
 
-    private func isDefaultDStrokeAbbreviation(_ word: String) -> Bool {
-        guard word.count == 2,
-              word.first == "Đ",
-              let lastChar = word.last,
-              String(lastChar) == String(lastChar).uppercased(),
-              let lastKey = VietnameseData.keyCode(for: Character(String(lastChar).lowercased())) else {
+    func isDefaultDStrokeAbbreviation(_ word: String) -> Bool {
+        let characters = Array(word)
+        guard characters.count >= 2, characters.contains("Đ") else {
             return false
         }
 
-        return vietnameseData.isConsonant(lastKey)
+        return characters.allSatisfy { $0.isLetter && String($0) == String($0).uppercased() }
     }
 
     private func isUppercaseVietnameseMarkedAbbreviation(_ word: String) -> Bool {
@@ -123,9 +120,10 @@ extension VNEngine {
             }
         }
 
-        // Proper-name abbreviations like ĐN/ĐL are valid short forms even though
-        // they are not dictionary words. Keep the Đ + uppercase consonant case enabled
-        // by default because DD→Đ has a high-risk raw restore path (DDN/DDL).
+        // All-caps abbreviations containing Đ at any position (ĐN, HĐ, PGĐ, HĐQT, ĐHQG)
+        // are valid short forms even though they are not dictionary words. Vietnamese-first:
+        // typing HĐ/GĐ is far more common than raw English caps like HDD, and the raw
+        // form is still reachable with an extra D (HDDD → HDD).
         if isDefaultDStrokeAbbreviation(word) {
             logCallback?("📖 checkWordSpelling: SKIPPED (uppercase d-stroke abbreviation), word='\(word)'")
             return true
