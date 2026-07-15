@@ -7,6 +7,7 @@
 
 import Cocoa
 import SwiftUI
+import Combine
 import Sparkle
 
 // MARK: - AXObserver Callback (C function)
@@ -286,9 +287,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         _ = AudioManager.shared
         debugWindowController?.logEvent("AudioManager initialized for wake-from-sleep handling")
 
-        // Check for Secure Input mode — this blocks ALL CGEvent taps from receiving keyDown events.
+        // Watch for Secure Input mode — this blocks ALL CGEvent taps from receiving keyDown events.
         // Common cause: 1Password, Terminal, browser password fields holding Secure Input ON.
-        checkAndWarnSecureInput()
+        // The subscription emits immediately, which performs the initial check.
+        setupSecureInputMonitoring()
 
         debugWindowController?.updateStatus("XKey started successfully")
         debugWindowController?.logEvent("XKey started successfully")
@@ -1244,7 +1246,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 
                 // Check Secure Input on app switch — password managers often enable it when focused
-                self.checkAndWarnSecureInput()
+                self.evaluateSecureInput()
             }
             
             // Reset intra-app focus tracking (new app = new baseline)
@@ -1947,51 +1949,78 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     // MARK: - Secure Input Detection
-    
-    /// Track Secure Input state to avoid spamming debug log
-    private var lastSecureInputLogTime: CFAbsoluteTime = 0
-    private var lastSecureInputPID: pid_t = 0
-    
-    /// Check if Secure Input is active and warn the user.
-    /// When Secure Input is ON, ALL CGEvent taps are blocked from receiving keyDown/keyUp events,
-    /// making XKey and all third-party input methods completely non-functional.
-    /// The overlay shows on EVERY check (e.g., every app switch) to remind the user.
-    /// Debug log is throttled to avoid spam.
-    @discardableResult
-    private func checkAndWarnSecureInput() -> Bool {
-        guard let manager = eventTapManager else { return false }
-        
+
+    /// Last observed Secure Input state. Drives edge-triggered evaluation: side effects
+    /// fire only when this changes, which is what makes evaluateSecureInput() safe to
+    /// call from the poll timer and every event hook.
+    private var lastSecureInputState = SecureInputState()
+    private var secureInputTimer: Timer?
+    private var secureInputCancellable: AnyCancellable?
+
+    /// Start watching Secure Input. When Secure Input is ON, ALL CGEvent taps are blocked
+    /// from receiving keyDown/keyUp events, making XKey and every third-party input method
+    /// non-functional — the user needs to be told why typing stopped working.
+    ///
+    /// Vietnamese state is observed rather than hooked at each call site: all eight paths
+    /// that change it funnel through this @Published property. It also emits its current
+    /// value on subscribe, which performs the initial check.
+    private func setupSecureInputMonitoring() {
+        secureInputCancellable = statusBarManager?.viewModel.$isVietnameseEnabled
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                if enabled {
+                    self?.startSecureInputPolling()
+                } else {
+                    self?.stopSecureInputPolling()
+                }
+                self?.evaluateSecureInput()
+            }
+    }
+
+    /// Poll only while the XKey engine is on. Catches transitions that emit no event at all,
+    /// such as Terminal's "Secure Keyboard Entry" menu item or a holder quitting in
+    /// the background. Costs ~0.011ms per tick; tolerance lets macOS coalesce wakeups.
+    private func startSecureInputPolling() {
+        guard secureInputTimer == nil else { return }
+        let timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            self?.evaluateSecureInput()
+        }
+        timer.tolerance = 1.0
+        secureInputTimer = timer
+    }
+
+    private func stopSecureInputPolling() {
+        secureInputTimer?.invalidate()
+        secureInputTimer = nil
+    }
+
+    /// Read the current Secure Input state and apply whatever the transition warrants.
+    /// Idempotent — repeated calls with no state change do nothing.
+    private func evaluateSecureInput() {
+        guard let manager = eventTapManager else { return }
+
         let (isSecure, pid, appName) = manager.checkSecureInput()
-        
-        if isSecure {
-            let name = appName ?? "Unknown"
-            
-            // Only show overlay when Vietnamese mode is ON.
-            // If user is in English mode, Secure Input doesn't affect typing.
-            let isVietnamese = statusBarManager?.viewModel.isVietnameseEnabled ?? false
-            if isVietnamese {
-                SecureInputOverlay.shared.show(appName: name)
-            }
-            
-            // Throttle debug log: only log once per app, or every 30 seconds for the same app
-            let now = CFAbsoluteTimeGetCurrent()
-            let samePID = pid == lastSecureInputPID
-            if !samePID || (now - lastSecureInputLogTime) > 30.0 {
-                lastSecureInputLogTime = now
-                lastSecureInputPID = pid ?? 0
-                debugWindowController?.logEvent("⚠️ Secure Input đang BẬT bởi '\(name)' — XKey không thể nhận phím!")
-                debugWindowController?.updateStatus("⚠️ Secure Input: \(name)")
-            }
-            return true
-        } else {
-            // Clear state when Secure Input is released
-            if lastSecureInputPID != 0 {
-                lastSecureInputPID = 0
+        let name = appName ?? "Unknown"
+        let new = SecureInputState(
+            pid: isSecure ? (pid ?? 0) : 0,
+            vietnamese: statusBarManager?.viewModel.isVietnameseEnabled ?? false
+        )
+        let old = lastSecureInputState
+        lastSecureInputState = new
+
+        for action in secureInputActions(from: old, to: new, appName: name) {
+            switch action {
+            case .showOverlay(let appName):
+                SecureInputOverlay.shared.show(appName: appName)
+            case .hideOverlay:
                 SecureInputOverlay.shared.hide()
+            case .logHeld(let appName):
+                debugWindowController?.logEvent("⚠️ Secure Input đang BẬT bởi '\(appName)' — XKey không thể nhận phím!")
+                debugWindowController?.updateStatus("⚠️ Secure Input: \(appName)")
+            case .logReleased:
                 debugWindowController?.logEvent("✅ Secure Input đã TẮT — XKey hoạt động bình thường")
                 debugWindowController?.updateStatus("Ready")
             }
-            return false
         }
     }
 
@@ -2384,7 +2413,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Update last signature (for timer-based checkIntraAppFocusChange)
         lastFocusedElementSignature = currentSignature
-        
+
+        // Focusing a password field enables Secure Input with no app switch — WebKit does
+        // this in Safari and Chrome. This is the only trigger that catches it promptly.
+        evaluateSecureInput()
+
         // Check toolbar display (only if enabled)
         // This ensures toolbar shows/hides when focus changes via keyboard (CMD+T, Tab, etc.)
         let preferences = SharedSettings.shared.loadPreferences()

@@ -94,6 +94,7 @@
 		A1000007 /* InputProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000007 /* InputProcessor.swift */; };
 		A1000008 /* VNEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000008 /* VNEngine.swift */; };
 		A1000009 /* EventTapManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000009 /* EventTapManager.swift */; };
+		SECINP0001 /* SecureInputStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = SECINP0002 /* SecureInputStateMachine.swift */; };
 		A100000A /* CharacterInjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000A /* CharacterInjector.swift */; };
 		A100000B /* KeyboardEventHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000B /* KeyboardEventHandler.swift */; };
 		A100000C /* AdvancedInjectionMethods.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000C /* AdvancedInjectionMethods.swift */; };
@@ -132,6 +133,7 @@
 		MACR0001 /* MacroManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = MACR0002 /* MacroManagerTests.swift */; };
 		DBGLOG0001 /* DebugLoggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBGLOG0002 /* DebugLoggerTests.swift */; };
 		INJROUTE0001 /* InjectionRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = INJROUTE0002 /* InjectionRoutingTests.swift */; };
+		SECINP0003 /* SecureInputStateMachineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SECINP0004 /* SecureInputStateMachineTests.swift */; };
 		MACROVM001 /* MacroManagementViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = MACROVM002 /* MacroManagementViewModel.swift */; };
 		STATUSBARVM001 /* StatusBarViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = STATUSBARVM002 /* StatusBarViewModel.swift */; };
 		TEST00001 /* VNEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00002 /* VNEngineTests.swift */; };
@@ -236,6 +238,7 @@
 		A2000007 /* InputProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputProcessor.swift; sourceTree = "<group>"; };
 		A2000008 /* VNEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VNEngine.swift; sourceTree = "<group>"; };
 		A2000009 /* EventTapManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventTapManager.swift; sourceTree = "<group>"; };
+		SECINP0002 /* SecureInputStateMachine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureInputStateMachine.swift; sourceTree = "<group>"; };
 		A200000A /* CharacterInjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharacterInjector.swift; sourceTree = "<group>"; };
 		A200000B /* KeyboardEventHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardEventHandler.swift; sourceTree = "<group>"; };
 		A200000C /* AdvancedInjectionMethods.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvancedInjectionMethods.swift; sourceTree = "<group>"; };
@@ -266,6 +269,7 @@
 		MACR0002 /* MacroManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroManagerTests.swift; sourceTree = "<group>"; };
 		DBGLOG0002 /* DebugLoggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLoggerTests.swift; sourceTree = "<group>"; };
 		INJROUTE0002 /* InjectionRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InjectionRoutingTests.swift; sourceTree = "<group>"; };
+		SECINP0004 /* SecureInputStateMachineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureInputStateMachineTests.swift; sourceTree = "<group>"; };
 		MACROVM002 /* MacroManagementViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroManagementViewModel.swift; sourceTree = "<group>"; };
 		STATUSBARVM002 /* StatusBarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarViewModel.swift; sourceTree = "<group>"; };
 		TEST00002 /* VNEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VNEngineTests.swift; sourceTree = "<group>"; };
@@ -473,6 +477,7 @@
 			isa = PBXGroup;
 			children = (
 				A2000009 /* EventTapManager.swift */,
+				SECINP0002 /* SecureInputStateMachine.swift */,
 				A200000A /* CharacterInjector.swift */,
 				A200000B /* KeyboardEventHandler.swift */,
 				A200000C /* AdvancedInjectionMethods.swift */,
@@ -569,6 +574,7 @@
 				ADAPT0002 /* VNEngineAdaptiveTests.swift */,
 				DBGLOG0002 /* DebugLoggerTests.swift */,
 				INJROUTE0002 /* InjectionRoutingTests.swift */,
+				SECINP0004 /* SecureInputStateMachineTests.swift */,
 			);
 			path = XKeyTests;
 			sourceTree = "<group>";
@@ -781,6 +787,7 @@
 				076E1EE87A0B4E65964C01B1 /* FloatingOverlay.swift in Sources */,
 				106779A72ED41FD400FE0B24 /* DebugWindowController.swift in Sources */,
 				A1000009 /* EventTapManager.swift in Sources */,
+				SECINP0001 /* SecureInputStateMachine.swift in Sources */,
 				1095C4DF2EFB02EA00C03826 /* VNEngineSpellCheck.swift in Sources */,
 				1095C4D72EFB016B00C03826 /* VNDictionaryManager.swift in Sources */,
 				A100000A /* CharacterInjector.swift in Sources */,
@@ -873,6 +880,7 @@
 				ADAPT0001 /* VNEngineAdaptiveTests.swift in Sources */,
 				DBGLOG0001 /* DebugLoggerTests.swift in Sources */,
 				INJROUTE0001 /* InjectionRoutingTests.swift in Sources */,
+				SECINP0003 /* SecureInputStateMachineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
