@@ -140,10 +140,10 @@ class DebugLogger {
     }
 
     /// Log a debug message (only if verbose logging is enabled)
-    func debug(_ message: String, source: String = "") {
+    func debug(_ message: @autoclosure () -> String, source: String = "") {
         let verbose = debugWindowController?.isVerboseLogging ?? isVerboseLogging
         guard verbose else { return }
-        log(message, source: source, level: .debug)
+        log(message(), source: source, level: .debug)
     }
 }
 
