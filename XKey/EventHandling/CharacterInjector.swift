@@ -30,6 +30,10 @@ class CharacterInjector {
     /// Serial queue used only for slow injection paths that already post directly to
     /// `.cgSessionEventTap`; proxy-based paths remain synchronous on the tap callback.
     private let slowInjectionQueue = DispatchQueue(label: "com.codetay.XKey.slow-injection", qos: .userInteractive)
+
+    /// Settle time after a `.slow` injection. Shared by injectSync and the async
+    /// direct-post path, which reproduce the same `.slow` sequence and must not drift.
+    private static let slowSettleTime: UInt32 = 20000
     
     // Debug callback
     var debugCallback: ((String) -> Void)?
@@ -99,15 +103,39 @@ class CharacterInjector {
     /// paths already post every event directly to `.cgSessionEventTap`, so moving them
     /// off the event-tap callback does not change their posting behavior. Any path that
     /// may use `CGEventTapProxy` remains synchronous and unchanged.
+    /// Decides whether an injection may leave the event-tap callback.
+    ///
+    /// Async is only safe for the `.slow` paths that post every event directly to
+    /// `.cgSessionEventTap`, because `performSlowDirectInjection` reproduces exactly that
+    /// subset: it has no `CGEventTapProxy`, no empty-char prefix, no paste, and no Forward
+    /// Delete step. Every other combination must stay on `injectSync`.
+    ///
+    /// `needsForwardDelete` is an autoclosure and a parameter rather than a direct
+    /// `AppBehaviorDetector` call: resolving it hits the frontmost app and scans the
+    /// confirmed method description, and `injectSync` only consults it when
+    /// `backspaceCount > 0`, so a plain insert must not pay for it.
+    static func canRunSlowDirectAsync(
+        method: InjectionMethod,
+        needsEmptyCharPrefix: Bool,
+        textSendingMethod: TextSendingMethod,
+        backspaceCount: Int,
+        needsForwardDelete: @autoclosure () -> Bool
+    ) -> Bool {
+        guard method == .slow, !needsEmptyCharPrefix, textSendingMethod != .paste else {
+            return false
+        }
+        return backspaceCount == 0 || !needsForwardDelete()
+    }
+
     func inject(backspaceCount: Int, characters: [VNCharacter], codeTable: CodeTable, proxy: CGEventTapProxy) {
         let methodInfo = AppBehaviorDetector.shared.getConfirmedInjectionMethod()
-        // needsForwardDeleteWithAXCheck resolves the frontmost bundle id and scans the
-        // confirmed method description, so keep it behind the backspace check: injectSync
-        // only consults it when backspaceCount > 0, and most keystrokes insert without one.
-        let canRunSlowDirectAsync = methodInfo.method == .slow
-            && !methodInfo.needsEmptyCharPrefix
-            && methodInfo.textSendingMethod != .paste
-            && (backspaceCount == 0 || !AppBehaviorDetector.shared.needsForwardDeleteWithAXCheck)
+        let canRunSlowDirectAsync = Self.canRunSlowDirectAsync(
+            method: methodInfo.method,
+            needsEmptyCharPrefix: methodInfo.needsEmptyCharPrefix,
+            textSendingMethod: methodInfo.textSendingMethod,
+            backspaceCount: backspaceCount,
+            needsForwardDelete: AppBehaviorDetector.shared.needsForwardDeleteWithAXCheck
+        )
 
         guard canRunSlowDirectAsync else {
             injectSync(
@@ -318,7 +346,7 @@ class CharacterInjector {
         // Settle time (skip if paste config says so)
         let shouldSkipSettle = (textSendingMethod == .paste && methodInfo.pasteConfig.skipSettleTime)
         if !shouldSkipSettle {
-            let settleTime: UInt32 = (method == .slow) ? 20000 : 5000
+            let settleTime: UInt32 = (method == .slow) ? Self.slowSettleTime : 5000
             usleep(settleTime)
         }
         
@@ -361,7 +389,7 @@ class CharacterInjector {
             }
         }
 
-        usleep(20000) // Preserve the existing `.slow` settle time.
+        usleep(Self.slowSettleTime)
         debugCallback?("Inject async slow-direct: complete")
     }
     

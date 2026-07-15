@@ -131,6 +131,7 @@
 		LAUNCHATLOGIN001 /* LaunchAtLogin.swift in Sources */ = {isa = PBXBuildFile; fileRef = LAUNCHATLOGIN002 /* LaunchAtLogin.swift */; };
 		MACR0001 /* MacroManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = MACR0002 /* MacroManagerTests.swift */; };
 		DBGLOG0001 /* DebugLoggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBGLOG0002 /* DebugLoggerTests.swift */; };
+		INJROUTE0001 /* InjectionRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = INJROUTE0002 /* InjectionRoutingTests.swift */; };
 		MACROVM001 /* MacroManagementViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = MACROVM002 /* MacroManagementViewModel.swift */; };
 		STATUSBARVM001 /* StatusBarViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = STATUSBARVM002 /* StatusBarViewModel.swift */; };
 		TEST00001 /* VNEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00002 /* VNEngineTests.swift */; };
@@ -264,6 +265,7 @@
 		LAUNCHATLOGIN002 /* LaunchAtLogin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLogin.swift; sourceTree = "<group>"; };
 		MACR0002 /* MacroManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroManagerTests.swift; sourceTree = "<group>"; };
 		DBGLOG0002 /* DebugLoggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLoggerTests.swift; sourceTree = "<group>"; };
+		INJROUTE0002 /* InjectionRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InjectionRoutingTests.swift; sourceTree = "<group>"; };
 		MACROVM002 /* MacroManagementViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroManagementViewModel.swift; sourceTree = "<group>"; };
 		STATUSBARVM002 /* StatusBarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarViewModel.swift; sourceTree = "<group>"; };
 		TEST00002 /* VNEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VNEngineTests.swift; sourceTree = "<group>"; };
@@ -566,6 +568,7 @@
 				MACR0002 /* MacroManagerTests.swift */,
 				ADAPT0002 /* VNEngineAdaptiveTests.swift */,
 				DBGLOG0002 /* DebugLoggerTests.swift */,
+				INJROUTE0002 /* InjectionRoutingTests.swift */,
 			);
 			path = XKeyTests;
 			sourceTree = "<group>";
@@ -869,6 +872,7 @@
 				MACR0001 /* MacroManagerTests.swift in Sources */,
 				ADAPT0001 /* VNEngineAdaptiveTests.swift in Sources */,
 				DBGLOG0001 /* DebugLoggerTests.swift in Sources */,
+				INJROUTE0001 /* InjectionRoutingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
