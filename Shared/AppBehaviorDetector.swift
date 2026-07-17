@@ -431,6 +431,9 @@ struct WindowTitleRule: Codable, Identifiable {
     
     /// Bundle ID pattern to match (empty string = any app, supports regex)
     let bundleIdPattern: String
+
+    /// Exact bundle IDs that must not match this rule; array order keeps exported JSON stable
+    let excludedBundleIds: [String]
     
     /// Window title pattern to match
     let titlePattern: String
@@ -513,6 +516,10 @@ struct WindowTitleRule: Codable, Identifiable {
     ///   - axInfo: The focused element's AX attributes (required for rules with AX patterns)
     /// - Returns: true if all specified patterns match
     func matches(bundleId: String, windowTitle: String, axInfo: AppBehaviorDetector.FocusedElementInfo?) -> Bool {
+        guard !excludedBundleIds.contains(bundleId) else {
+            return false
+        }
+
         // Check bundle ID pattern
         if !bundleIdPattern.isEmpty {
             // If pattern contains pipe | it's OR matching
@@ -606,7 +613,7 @@ struct WindowTitleRule: Codable, Identifiable {
     // MARK: - Codable
     
     enum CodingKeys: String, CodingKey {
-        case id, name, bundleIdPattern, titlePattern, matchMode, isEnabled, sortIndex
+        case id, name, bundleIdPattern, excludedBundleIds, titlePattern, matchMode, isEnabled, sortIndex
         // AX matching patterns
         case axRolePattern, axDescriptionPattern, axIdentifierPattern, axDOMClassList
         // Behavior overrides
@@ -620,6 +627,7 @@ struct WindowTitleRule: Codable, Identifiable {
         id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         name = try container.decode(String.self, forKey: .name)
         bundleIdPattern = try container.decode(String.self, forKey: .bundleIdPattern)
+        excludedBundleIds = try container.decodeIfPresent([String].self, forKey: .excludedBundleIds) ?? []
         titlePattern = try container.decode(String.self, forKey: .titlePattern)
         matchMode = try container.decode(WindowTitleMatchMode.self, forKey: .matchMode)
         isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
@@ -665,6 +673,9 @@ struct WindowTitleRule: Codable, Identifiable {
         try container.encode(id, forKey: .id)
         try container.encode(name, forKey: .name)
         try container.encode(bundleIdPattern, forKey: .bundleIdPattern)
+        if !excludedBundleIds.isEmpty {
+            try container.encode(excludedBundleIds, forKey: .excludedBundleIds)
+        }
         try container.encode(titlePattern, forKey: .titlePattern)
         try container.encode(matchMode, forKey: .matchMode)
         try container.encode(isEnabled, forKey: .isEnabled)
@@ -711,6 +722,7 @@ struct WindowTitleRule: Codable, Identifiable {
         bundleIdPattern: String,
         titlePattern: String,
         matchMode: WindowTitleMatchMode,
+        excludedBundleIds: [String] = [],
         isEnabled: Bool = true,
         sortIndex: Int = WindowTitleRule.unassignedSortIndex,
         // AX matching patterns
@@ -735,6 +747,7 @@ struct WindowTitleRule: Codable, Identifiable {
         self.id = UUID()
         self.name = name
         self.bundleIdPattern = bundleIdPattern
+        self.excludedBundleIds = excludedBundleIds
         self.titlePattern = titlePattern
         self.matchMode = matchMode
         self.isEnabled = isEnabled
@@ -1084,14 +1097,14 @@ class AppBehaviorDetector {
         // (Word) only — Excel/PowerPoint Online use different editing surfaces and
         // are not yet verified.
         //
-        // NOTE: any window whose title contains ".docx" matches — including the
-        // native Word desktop app. Harmless (slow + one-by-one is correct
-        // everywhere, only slower than Word's tuned .fast), but be aware of it.
+        // NOTE: any window whose title contains ".docx" matches, except apps in
+        // excludedBundleIds whose native editors require a different injection strategy.
         WindowTitleRule(
             name: "Word for the web",
             bundleIdPattern: "",  // Match all apps — rely on the .docx window title
             titlePattern: "\\.docx",
             matchMode: .regex,
+            excludedBundleIds: ["org.libreoffice.script"],
             useMarkedText: false,
             hasMarkedTextIssues: true,
             commitDelay: 5000,

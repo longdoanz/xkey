@@ -283,6 +283,7 @@ struct WindowTitleRulesView: View {
                     bundleIdPattern: rule.bundleIdPattern,
                     titlePattern: rule.titlePattern,
                     matchMode: rule.matchMode,
+                    excludedBundleIds: rule.excludedBundleIds,
                     isEnabled: rule.isEnabled,
                     // AX matching patterns
                     axRolePattern: rule.axRolePattern,
@@ -1399,6 +1400,7 @@ struct AddRuleSheet: View {
             bundleIdPattern: bundleIdPattern,
             titlePattern: titlePattern,
             matchMode: matchMode,
+            excludedBundleIds: existingRule?.excludedBundleIds ?? [],
             isEnabled: isEditing ? ruleIsEnabled : true,  // Preserve enabled state when editing
             // AX matching patterns
             axRolePattern: showAXPatterns && !axRolePattern.isEmpty ? axRolePattern : nil,

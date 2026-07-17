@@ -430,6 +430,106 @@ class ToggleWindowTitleRulesTests: XCTestCase {
             "Merging a rule without an override must leave the result's value nil")
     }
 
+    // MARK: - Excluded Bundle ID Tests
+
+    func testWindowTitleRule_DoesNotMatchExcludedBundle() {
+        let rule = WindowTitleRule(
+            name: "Word for the web",
+            bundleIdPattern: "",
+            titlePattern: "\\.docx",
+            matchMode: .regex,
+            excludedBundleIds: ["org.libreoffice.script"]
+        )
+
+        XCTAssertFalse(rule.matches(
+            bundleId: "org.libreoffice.script",
+            windowTitle: "Untitled 2.docx",
+            axInfo: nil
+        ))
+    }
+
+    func testWindowTitleRule_StillMatchesUnknownBrowserWhenLibreOfficeIsExcluded() {
+        let rule = WindowTitleRule(
+            name: "Word for the web",
+            bundleIdPattern: "",
+            titlePattern: "\\.docx",
+            matchMode: .regex,
+            excludedBundleIds: ["org.libreoffice.script"]
+        )
+
+        XCTAssertTrue(rule.matches(
+            bundleId: "com.example.unknown-browser",
+            windowTitle: "Report.docx",
+            axInfo: nil
+        ))
+    }
+
+    func testWindowTitleRule_DefaultExcludedBundleIdsIsEmpty() {
+        let rule = WindowTitleRule(
+            name: "Legacy rule",
+            bundleIdPattern: "",
+            titlePattern: "\\.docx",
+            matchMode: .regex
+        )
+
+        XCTAssertTrue(rule.excludedBundleIds.isEmpty)
+        XCTAssertTrue(rule.matches(
+            bundleId: "org.libreoffice.script",
+            windowTitle: "Legacy.docx",
+            axInfo: nil
+        ))
+    }
+
+    func testBuiltInWordForWebRule_ExcludesLibreOfficeButMatchesUnknownBrowser() throws {
+        let rule = try XCTUnwrap(AppBehaviorDetector.builtInWindowTitleRules.first {
+            $0.name == "Word for the web"
+        })
+
+        XCTAssertFalse(rule.matches(
+            bundleId: "org.libreoffice.script",
+            windowTitle: "Untitled 2.docx",
+            axInfo: nil
+        ))
+        XCTAssertTrue(rule.matches(
+            bundleId: "com.example.unknown-browser",
+            windowTitle: "Report.docx",
+            axInfo: nil
+        ))
+    }
+
+    func testWindowTitleRule_ExcludedBundleIdsRoundTripInStableOrder() throws {
+        let rule = WindowTitleRule(
+            name: "Excluded apps",
+            bundleIdPattern: "",
+            titlePattern: "\\.docx",
+            matchMode: .regex,
+            excludedBundleIds: ["org.libreoffice.script", "com.example.Editor"]
+        )
+
+        let decoded = try JSONDecoder().decode(
+            WindowTitleRule.self,
+            from: JSONEncoder().encode(rule)
+        )
+
+        XCTAssertEqual(decoded.excludedBundleIds, rule.excludedBundleIds)
+    }
+
+    func testWindowTitleRule_DecodesMissingExcludedBundleIdsAsEmpty() throws {
+        let rule = WindowTitleRule(
+            name: "Legacy rule",
+            bundleIdPattern: "",
+            titlePattern: "\\.docx",
+            matchMode: .regex
+        )
+        let data = try JSONEncoder().encode(rule)
+        let json = String(data: data, encoding: .utf8) ?? ""
+
+        XCTAssertFalse(json.contains("excludedBundleIds"))
+
+        let decoded = try JSONDecoder().decode(WindowTitleRule.self, from: data)
+        XCTAssertTrue(decoded.excludedBundleIds.isEmpty)
+    }
+
     func testInjectionMethodInfo_DefaultsToNoEmptyCharPrefix() {
         // Priority 1/2 fall back to `false` when no rule sets the override; verify the
         // InjectionMethodInfo default matches that contract.
